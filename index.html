@@ -39,30 +39,31 @@
 <div id="log" class="card">System logs initialized...</div>
 
 <script type="module">
-    // Using the root entry point which CDNs usually map correctly
-    import init, { RpcClient, Encoding } from 'https://cdn.jsdelivr.net/npm/kaspa-wasm@0.13.0/kaspa_wasm.js';
+    // Import everything as 'kaspa' to avoid the "Named Export" error
+    import init, * as kaspa from 'https://cdn.jsdelivr.net/npm/kaspa-wasm@0.13.0/kaspa_wasm.js';
 
     async function start() {
         const btn = document.getElementById('connBtn');
         const msgBox = document.getElementById('msg-box');
 
         try {
-            // Initializing the WASM
+            // Initialize the WASM engine
             await init(); 
-            console.log("Kaspa WASM 0.13.0 Initialized");
+            console.log("Kaspa WASM 0.13.0 Loaded. Available exports:", Object.keys(kaspa));
 
             btn.addEventListener('click', async () => {
                 const ip = document.getElementById('nodeIp').value.trim();
                 
                 msgBox.style.display = "block";
                 msgBox.className = "success";
-                msgBox.innerText = "Connecting...";
+                msgBox.innerText = "Connecting to your Pi...";
                 btn.disabled = true;
 
                 try {
-                    const rpc = new RpcClient({
+                    // Use the 'kaspa' namespace to access RpcClient and Encoding
+                    const rpc = new kaspa.RpcClient({
                         url: `ws://${ip}:17110`,
-                        encoding: Encoding.Borsh,
+                        encoding: kaspa.Encoding.Borsh,
                         networkId: "mainnet"
                     });
 
@@ -74,17 +75,18 @@
                     btn.innerText = "CONNECTED";
                     
                 } catch (err) {
-                    console.error(err);
+                    console.error("RPC Error:", err);
                     msgBox.className = "error";
                     msgBox.innerText = `RPC ERROR: ${err.message}`;
                     btn.disabled = false;
+                    btn.innerText = "RETRY";
                 }
             });
         } catch (e) {
-            console.error("SDK Load Error:", e);
+            console.error("Init Error:", e);
             msgBox.style.display = "block";
             msgBox.className = "error";
-            msgBox.innerText = "SDK Load Error. Check F12 console.";
+            msgBox.innerText = "Failed to boot WASM engine.";
         }
     }
 
@@ -93,6 +95,7 @@
 </body>
 
 </html>
+
 
 
 
