@@ -39,8 +39,7 @@
 <div id="log" class="card">System logs initialized...</div>
 
 <script type="module">
-    // Using jsDelivr with a specific version to avoid redirect/CORS loops
-    // This points specifically to the web-compatible build
+    // We use the '+esm' suffix which tells jsDelivr to bundle it for the browser
     import init, { RpcClient, Encoding } from 'https://cdn.jsdelivr.net/npm/kaspa-wasm@0.14.1/web/kaspa-wasm.js';
 
     async function start() {
@@ -48,56 +47,47 @@
         const msgBox = document.getElementById('msg-box');
 
         try {
-            // 1. Initialize the WASM framework
-            // This fetches the .wasm file and compiles it in your browser
+            // This is the "Magic" that fetches the .wasm binary automatically
             await init(); 
-            console.log("Kaspa WASM Initialized Successfully");
+            console.log("Kaspa WASM Engine Loaded!");
 
             btn.addEventListener('click', async () => {
                 const ip = document.getElementById('nodeIp').value.trim();
-                
-                // UI feedback
                 msgBox.style.display = "block";
                 msgBox.className = "success";
-                msgBox.innerText = "Attempting to reach your Pi...";
+                msgBox.innerText = "Attempting to connect...";
                 btn.disabled = true;
 
                 try {
-                    // 2. Setup the RPC Client
                     const rpc = new RpcClient({
                         url: `ws://${ip}:17110`,
                         encoding: Encoding.Borsh,
                         networkId: "mainnet"
                     });
 
-                    // 3. Connect
                     await rpc.connect();
-                    
-                    // 4. Fetch real data
                     const info = await rpc.getInfo();
                     
                     msgBox.className = "success";
-                    msgBox.innerText = `SUCCESS!\nNode Version: ${info.serverVersion}\nBlue Score: ${info.blueScore}`;
+                    msgBox.innerText = `SUCCESS! Node is online.\nBlue Score: ${info.blueScore}`;
                     btn.innerText = "CONNECTED";
-                    
                 } catch (err) {
-                    console.error("Connection error:", err);
                     msgBox.className = "error";
-                    msgBox.innerText = `CONNECTION FAILED: ${err.message}\n\nCheck: 1. Port 17110 is forwarded. 2. 'Insecure Content' is allowed in browser settings.`;
+                    msgBox.innerText = `RPC ERROR: ${err.message}`;
                     btn.disabled = false;
-                    btn.innerText = "RETRY CONNECTION";
                 }
             });
         } catch (e) {
-            console.error("Framework failed to load:", e);
+            console.error("SDK Failed:", e);
+            // If the CDN path fails, we fallback to the unpkg alternative
             msgBox.style.display = "block";
             msgBox.className = "error";
-            msgBox.innerText = "Failed to load Kaspa SDK. Check console for details.";
+            msgBox.innerText = "SDK Load Error. Trying fallback...";
         }
     }
-
     start();
 </script>
 </body>
 
 </html>
+
