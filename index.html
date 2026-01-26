@@ -1,105 +1,55 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <title>Knock: Unified Node & Miner Dashboard</title>
+    <title>Knock Node Test</title>
     <style>
-        :root { --ks-teal: #00ffcc; --ks-bg: #0a0a0a; --panel: #161616; }
-        body { font-family: 'Courier New', monospace; background: var(--ks-bg); color: white; padding: 20px; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 1000px; margin: 0 auto; }
-        .card { background: var(--panel); border: 1px solid #333; padding: 20px; border-radius: 8px; }
-        h2 { color: var(--ks-teal); border-bottom: 1px solid #333; padding-bottom: 10px; margin-top: 0; }
-        .stat { margin: 15px 0; }
-        .label { color: #888; font-size: 0.8rem; text-transform: uppercase; }
-        .value { font-size: 1.4rem; color: #fff; display: block; }
-        .btn { width: 100%; padding: 10px; background: var(--ks-teal); border: none; font-weight: bold; cursor: pointer; margin-top: 10px; }
-        #log { font-size: 0.7rem; color: #666; height: 100px; overflow-y: auto; background: #000; padding: 10px; margin-top: 20px; }
+        body { background: #121212; color: #00ffcc; font-family: monospace; padding: 20px; }
+        #msg-box { border: 1px solid #333; padding: 10px; margin-top: 10px; white-space: pre-wrap; }
     </style>
 </head>
 <body>
+    <h2>KNOCK_DIAGNOSTIC</h2>
+    <input type="text" id="nodeIp" value="YOUR_PUBLIC_IP" placeholder="Node IP">
+    <button id="connBtn">CONNECT</button>
+    <div id="msg-box">Waiting for SDK...</div>
 
-<div class="grid">
-    <div class="card">
-        <h2>NODE_RPC</h2>
-        <input type="text" id="nodeIp" value="192.168.1.XX" style="width:70%; background:#000; color:#00ffcc; border:1px solid #444; padding:5px;">
-        <button class="btn" onclick="connectNode()">CONNECT RPC</button>
-        <div class="stat"><span class="label">Blue Score</span><span id="blueScore" class="value">---</span></div>
-        <div class="stat"><span class="label">Sync Status</span><span id="syncStatus" class="value">---</span></div>
-    </div>
+    <script type="module">
+        // This specific path 'kaspa-wasm/web/kaspa-wasm' is the browser-compatible one
+        import init, { RpcClient, Encoding } from 'https://unpkg.com/kaspa-wasm@0.13.0-rc.3/web/kaspa-wasm.js';
 
-    <div class="card">
-        <h2>STRATUM_METRICS</h2>
-        <input type="text" id="metricsPort" value="2114" style="width:40px; background:#000; color:#00ffcc; border:1px solid #444; padding:5px;">
-        <button class="btn" onclick="fetchMetrics()">REFRESH STATS</button>
-        <div class="stat"><span class="label">Wallet Balance</span><span id="mineBalance" class="value">0.00 KAS</span></div>
-        <div class="stat"><span class="label">Total Shares</span><span id="mineShares" class="value">0</span></div>
-    </div>
-</div>
+        async function run() {
+            const msgBox = document.getElementById('msg-box');
+            const btn = document.getElementById('connBtn');
 
-<div id="log" class="card">System logs initialized...</div>
+            try {
+                // Initialize the WASM
+                await init();
+                msgBox.innerText = "SDK Ready. Enter IP and click Connect.";
+                console.log("Kaspa WASM Initialized");
 
-<script src="https://cdn.jsdelivr.net/npm/kaspa-wasm@0.13.0/kaspa_wasm.js"></script>
-
-<script>
-    async function start() {
-        const btn = document.getElementById('connBtn');
-        const msgBox = document.getElementById('msg-box');
-
-        try {
-            // In the UMD version, the SDK is attached to 'window.kaspa' or the global scope
-            // We need to initialize the WASM. The function name is usually 'initKaspaFramework'
-            // or we just call the constructor if it's pre-initialized.
-            
-            console.log("Checking SDK...", window.kaspa_wasm);
-
-            btn.addEventListener('click', async () => {
-                const ip = document.getElementById('nodeIp').value.trim();
-                
-                msgBox.style.display = "block";
-                msgBox.className = "success";
-                msgBox.innerText = "Connecting to your Pi...";
-                btn.disabled = true;
-
-                try {
-                    // Using the global namespace provided by the script
-                    const rpc = new kaspa_wasm.RpcClient({
-                        url: `ws://${ip}:17110`,
-                        encoding: kaspa_wasm.Encoding.Borsh,
-                        networkId: "mainnet"
-                    });
-
-                    await rpc.connect();
-                    const info = await rpc.getInfo();
+                btn.addEventListener('click', async () => {
+                    const ip = document.getElementById('nodeIp').value;
+                    msgBox.innerText = "Connecting...";
                     
-                    msgBox.className = "success";
-                    msgBox.innerText = `CONNECTED!\nBlue Score: ${info.blueScore}`;
-                    btn.innerText = "CONNECTED";
-                    
-                } catch (err) {
-                    console.error("RPC Error:", err);
-                    msgBox.className = "error";
-                    msgBox.innerText = `RPC ERROR: ${err.message}`;
-                    btn.disabled = false;
-                    btn.innerText = "RETRY";
-                }
-            });
-        } catch (e) {
-            console.error("Setup Error:", e);
-            msgBox.style.display = "block";
-            msgBox.className = "error";
-            msgBox.innerText = "Failed to initialize Kaspa SDK.";
+                    try {
+                        const rpc = new RpcClient({
+                            url: `ws://${ip}:17110`,
+                            encoding: Encoding.Borsh,
+                            networkId: "mainnet"
+                        });
+                        await rpc.connect();
+                        const info = await rpc.getInfo();
+                        msgBox.innerText = "SUCCESS! Blue Score: " + info.blueScore;
+                    } catch (e) {
+                        msgBox.innerText = "RPC Error: " + e.message;
+                    }
+                });
+            } catch (e) {
+                msgBox.innerText = "SDK Load Error: " + e.message;
+            }
         }
-    }
 
-    // Run start once the window is ready
-    window.onload = start;
-</script>
+        run();
+    </script>
 </body>
-
 </html>
-
-
-
-
-
-
