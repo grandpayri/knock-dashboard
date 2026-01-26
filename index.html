@@ -38,18 +38,19 @@
 
 <div id="log" class="card">System logs initialized...</div>
 
-<script type="module">
-    // Import everything as 'kaspa' to avoid the "Named Export" error
-    import init, * as kaspa from 'https://cdn.jsdelivr.net/npm/kaspa-wasm@0.13.0/kaspa_wasm.js';
+<script src="https://cdn.jsdelivr.net/npm/kaspa-wasm@0.13.0/kaspa_wasm.js"></script>
 
+<script>
     async function start() {
         const btn = document.getElementById('connBtn');
         const msgBox = document.getElementById('msg-box');
 
         try {
-            // Initialize the WASM engine
-            await init(); 
-            console.log("Kaspa WASM 0.13.0 Loaded. Available exports:", Object.keys(kaspa));
+            // In the UMD version, the SDK is attached to 'window.kaspa' or the global scope
+            // We need to initialize the WASM. The function name is usually 'initKaspaFramework'
+            // or we just call the constructor if it's pre-initialized.
+            
+            console.log("Checking SDK...", window.kaspa_wasm);
 
             btn.addEventListener('click', async () => {
                 const ip = document.getElementById('nodeIp').value.trim();
@@ -60,10 +61,10 @@
                 btn.disabled = true;
 
                 try {
-                    // Use the 'kaspa' namespace to access RpcClient and Encoding
-                    const rpc = new kaspa.RpcClient({
+                    // Using the global namespace provided by the script
+                    const rpc = new kaspa_wasm.RpcClient({
                         url: `ws://${ip}:17110`,
-                        encoding: kaspa.Encoding.Borsh,
+                        encoding: kaspa_wasm.Encoding.Borsh,
                         networkId: "mainnet"
                     });
 
@@ -83,18 +84,20 @@
                 }
             });
         } catch (e) {
-            console.error("Init Error:", e);
+            console.error("Setup Error:", e);
             msgBox.style.display = "block";
             msgBox.className = "error";
-            msgBox.innerText = "Failed to boot WASM engine.";
+            msgBox.innerText = "Failed to initialize Kaspa SDK.";
         }
     }
 
-    start();
+    // Run start once the window is ready
+    window.onload = start;
 </script>
 </body>
 
 </html>
+
 
 
 
