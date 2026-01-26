@@ -39,45 +39,65 @@
 <div id="log" class="card">System logs initialized...</div>
 
 <script type="module">
-    import { RpcClient, Encoding, initKaspaFramework } from 'https://unpkg.com/kaspa-wasm/kaspa.js';
+    // Using jsDelivr with a specific version to avoid redirect/CORS loops
+    // This points specifically to the web-compatible build
+    import init, { RpcClient, Encoding } from 'https://cdn.jsdelivr.net/npm/kaspa-wasm@0.14.1/web/kaspa-wasm.js';
 
-    const log = (m) => { document.getElementById('log').innerText += `\n[${new Date().toLocaleTimeString()}] ${m}`; };
+    async function start() {
+        const btn = document.getElementById('connBtn');
+        const msgBox = document.getElementById('msg-box');
 
-    // 1. KASPA NODE CONNECTION
-    window.connectNode = async () => {
-        const ip = document.getElementById('nodeIp').value;
         try {
-            await initKaspaFramework();
-            const rpc = new RpcClient({ url: `ws://${ip}:17110`, encoding: Encoding.Borsh, networkId: "mainnet" });
-            await rpc.connect();
-            log("Connected to Node RPC.");
-            
-            // Auto-refresh Node info every 5 seconds
-            setInterval(async () => {
-                const info = await rpc.getInfo();
-                document.getElementById('blueScore').innerText = info.blueScore;
-                document.getElementById('syncStatus').innerText = info.isSynced ? "SYNCED" : "SYNCING...";
-            }, 5000);
-        } catch (e) { log("RPC Error: " + e.message); }
-    };
+            // 1. Initialize the WASM framework
+            // This fetches the .wasm file and compiles it in your browser
+            await init(); 
+            console.log("Kaspa WASM Initialized Successfully");
 
-    // 2. STRATUM METRICS SCRAPER
-    window.fetchMetrics = async () => {
-        const ip = document.getElementById('nodeIp').value;
-        const port = document.getElementById('metricsPort').value;
-        try {
-            const response = await fetch(`http://${ip}:${port}/metrics`);
-            const text = await response.text();
-            
-            // Regex to find our balance and shares from the text
-            const balance = text.match(/ks_balance_by_wallet_gauge\{.*\} ([\d.]+)/);
-            const shares = text.match(/ks_valid_share_counter\{.*\} ([\d.]+)/);
+            btn.addEventListener('click', async () => {
+                const ip = document.getElementById('nodeIp').value.trim();
+                
+                // UI feedback
+                msgBox.style.display = "block";
+                msgBox.className = "success";
+                msgBox.innerText = "Attempting to reach your Pi...";
+                btn.disabled = true;
 
-            document.getElementById('mineBalance').innerText = `${parseFloat(balance[1]).toFixed(2)} KAS`;
-            document.getElementById('mineShares').innerText = parseInt(shares[1]).toLocaleString();
-            log("Metrics updated successfully.");
-        } catch (e) { log("Metrics Error: " + e.message + " (Check CORS)"); }
-    };
+                try {
+                    // 2. Setup the RPC Client
+                    const rpc = new RpcClient({
+                        url: `ws://${ip}:17110`,
+                        encoding: Encoding.Borsh,
+                        networkId: "mainnet"
+                    });
+
+                    // 3. Connect
+                    await rpc.connect();
+                    
+                    // 4. Fetch real data
+                    const info = await rpc.getInfo();
+                    
+                    msgBox.className = "success";
+                    msgBox.innerText = `SUCCESS!\nNode Version: ${info.serverVersion}\nBlue Score: ${info.blueScore}`;
+                    btn.innerText = "CONNECTED";
+                    
+                } catch (err) {
+                    console.error("Connection error:", err);
+                    msgBox.className = "error";
+                    msgBox.innerText = `CONNECTION FAILED: ${err.message}\n\nCheck: 1. Port 17110 is forwarded. 2. 'Insecure Content' is allowed in browser settings.`;
+                    btn.disabled = false;
+                    btn.innerText = "RETRY CONNECTION";
+                }
+            });
+        } catch (e) {
+            console.error("Framework failed to load:", e);
+            msgBox.style.display = "block";
+            msgBox.className = "error";
+            msgBox.innerText = "Failed to load Kaspa SDK. Check console for details.";
+        }
+    }
+
+    start();
 </script>
 </body>
+
 </html>
