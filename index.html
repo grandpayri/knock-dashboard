@@ -39,17 +39,17 @@
 <div id="log" class="card">System logs initialized...</div>
 
 <script type="module">
-    // We point to the 'web' specific distribution of 0.13.0
-    import init, { RpcClient, Encoding } from 'https://cdn.jsdelivr.net/npm/kaspa-wasm@0.13.0/web/kaspa-wasm.js';
+    // NOTICE: 'kaspa_wasm.js' uses an underscore, not a hyphen
+    import init, { RpcClient, Encoding } from 'https://cdn.jsdelivr.net/npm/kaspa-wasm@0.13.0/web/kaspa_wasm.js';
 
     async function start() {
         const btn = document.getElementById('connBtn');
         const msgBox = document.getElementById('msg-box');
 
         try {
-            // Initialize the WASM binary from the CDN
+            // This bootloader fetches the .wasm sibling file from the same CDN folder
             await init(); 
-            console.log("Kaspa WASM 0.13.0 Initialized");
+            console.log("Kaspa WASM 0.13.0 (Web) Initialized");
 
             btn.addEventListener('click', async () => {
                 const ip = document.getElementById('nodeIp').value.trim();
@@ -60,7 +60,6 @@
                 btn.disabled = true;
 
                 try {
-                    // Note: 0.13.0 RpcClient constructor might prefer the object syntax
                     const rpc = new RpcClient({
                         url: `ws://${ip}:17110`,
                         encoding: Encoding.Borsh,
@@ -71,13 +70,13 @@
                     const info = await rpc.getInfo();
                     
                     msgBox.className = "success";
-                    msgBox.innerText = `CONNECTED!\nBlue Score: ${info.blueScore}\nNode: ${info.serverVersion}`;
+                    msgBox.innerText = `CONNECTED!\nBlue Score: ${info.blueScore}\nNode Version: ${info.serverVersion}`;
                     btn.innerText = "CONNECTED";
                     
                 } catch (err) {
-                    console.error(err);
+                    console.error("RPC Error:", err);
                     msgBox.className = "error";
-                    msgBox.innerText = `RPC ERROR: ${err.message || "Failed to connect. Is port 17110 open?"}`;
+                    msgBox.innerText = `RPC ERROR: ${err.message || "Is port 17110 open on your Pi?"}`;
                     btn.disabled = false;
                     btn.innerText = "RETRY CONNECTION";
                 }
@@ -86,7 +85,7 @@
             console.error("SDK Load Error:", e);
             msgBox.style.display = "block";
             msgBox.className = "error";
-            msgBox.innerText = "Critical: Could not load Kaspa SDK from CDN.";
+            msgBox.innerText = "Could not load the WASM binary. Check the F12 console.";
         }
     }
 
@@ -95,5 +94,6 @@
 </body>
 
 </html>
+
 
 
