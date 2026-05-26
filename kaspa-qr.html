@@ -18,12 +18,12 @@
     <header class="border-b border-slate-800 bg-slate-900/50 backdrop-blur px-6 py-4">
         <div class="max-w-4xl mx-auto flex justify-between items-center">
             <div class="flex items-center space-x-3">
-                <div class="w-8 h-8 rounded-full bg-kaspa flex items-center justify-center font-bold text-slate-900">𐤋</div>
+                <img src="logo.png" alt="Kaspa Logo" class="w-8 h-8 rounded-full object-contain" />
                 <h1 class="text-xl font-bold tracking-tight">Kaspa <span class="text-kaspa">QR Gen</span></h1>
             </div>
             
             <div class="flex items-center space-x-2 bg-slate-950 px-3 py-1 rounded-xl border border-slate-800 text-xs">
-                <span class="text-slate-400">Version <span id="version-display" class="font-mono text-kaspa font-semibold">12</span></span>
+                <span class="text-slate-400">Version <span id="version-display" class="font-mono text-kaspa font-semibold">14</span></span>
             </div>
         </div>
     </header>
@@ -56,7 +56,11 @@
                         <canvas id="qr-canvas" width="160" height="160" class="hidden"></canvas>
                         <div id="qr-placeholder" class="text-xs text-slate-500 italic text-center px-4">Waiting for valid address or KNS domain...</div>
                     </div>
-                    <div id="raw-uri" class="text-sm text-slate-200 font-mono font-bold mt-4 px-2 tracking-wide text-center selection:bg-kaspa/30"></div>
+                    
+                    <div class="mt-4 px-2 text-center flex flex-col space-y-1">
+                        <div id="raw-uri" class="text-sm text-slate-200 font-mono font-bold tracking-wide selection:bg-kaspa/30"></div>
+                        <div id="kns-uri" class="text-xs text-kaspa font-sans font-medium tracking-normal hidden"></div>
+                    </div>
                 </div>
 
                 <button 
@@ -77,7 +81,7 @@
     <script>
         (function() {
             // Hardcoded internally to track version history delivery across deployments
-            const DEPLOYED_VERSION = "12";
+            const DEPLOYED_VERSION = "14";
             
             // DOM Elements
             const addressInput = document.getElementById('address');
@@ -87,13 +91,14 @@
             const qrCanvas = document.getElementById('qr-canvas');
             const qrPlaceholder = document.getElementById('qr-placeholder');
             const rawUriDisplay = document.getElementById('raw-uri');
+            const knsUriDisplay = document.getElementById('kns-uri');
             const downloadBtn = document.getElementById('download-btn');
             const versionDisplay = document.getElementById('version-display');
 
             // Force internal state layout reflection instantly on load
             versionDisplay.textContent = DEPLOYED_VERSION;
 
-            // Pre-compile the local logo asset from the same root origin directory path
+            // Pre-compile local logo asset image object
             const logoAsset = new Image();
             logoAsset.src = "logo.png";
 
@@ -121,6 +126,7 @@
                     }, 500);
                 } else {
                     statusLabel.classList.add('hidden');
+                    knsUriDisplay.classList.add('hidden'); // Clear secondary field for plain inputs
                     if (input.startsWith('kaspa:') || input.startsWith('kaspatest:')) {
                         errorMsg.classList.add('hidden');
                         generateQR(input);
@@ -147,6 +153,9 @@
                     
                     if (payload && payload.success === true && payload.data && payload.data.owner) {
                         statusLabel.textContent = "Resolved ✓";
+                        // Reveal domain line alongside processed payload targets
+                        knsUriDisplay.textContent = domainName;
+                        knsUriDisplay.classList.remove('hidden');
                         generateQR(payload.data.owner);
                         return;
                     }
@@ -164,6 +173,8 @@
                     const payload = JSON.parse(wrapper.contents);
                     if (payload && payload.success === true && payload.data && payload.data.owner) {
                         statusLabel.textContent = "Resolved ✓";
+                        knsUriDisplay.textContent = domainName;
+                        knsUriDisplay.classList.remove('hidden');
                         generateQR(payload.data.owner);
                         return;
                     }
@@ -229,7 +240,6 @@
                 const badgeSize = 38; 
                 const radius = 6;     
 
-                // Draw protective solid white padding container background square
                 ctx.fillStyle = "#ffffff";
                 ctx.beginPath();
                 ctx.moveTo(center - badgeSize/2 + radius, center - badgeSize/2);
@@ -244,7 +254,6 @@
                 ctx.closePath();
                 ctx.fill();
 
-                // Render the newly localized repository asset directly over the middle canvas layer coordinates
                 const logoDimensions = 32; 
                 ctx.drawImage(
                     logoAsset, 
@@ -263,34 +272,3 @@
                 qrPlaceholder.classList.remove('hidden');
                 qrCanvas.classList.add('hidden');
                 rawUriDisplay.textContent = "";
-                setBtnDisabled(true);
-            }
-
-            function setBtnDisabled(isDisabled) {
-                downloadBtn.disabled = isDisabled;
-                if (isDisabled) {
-                    downloadBtn.classList.remove('bg-kaspa', 'hover:bg-[#5bb3a2]', 'text-slate-900');
-                    downloadBtn.classList.add('bg-slate-700', 'text-slate-400');
-                } else {
-                    downloadBtn.classList.remove('bg-slate-700', 'text-slate-400');
-                    downloadBtn.classList.add('bg-kaspa', 'hover:bg-[#5bb3a2]', 'text-slate-900');
-                }
-            }
-
-            downloadBtn.addEventListener('click', () => {
-                if (qrCanvas.classList.contains('hidden')) return;
-                
-                const dataUrl = qrCanvas.toDataURL("image/png");
-                const link = document.createElement('a');
-                link.href = dataUrl;
-                link.download = `kaspa-qr-v${DEPLOYED_VERSION}.png`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            });
-
-            addressInput.addEventListener('input', evaluateInput);
-        })();
-    </script>
-</body>
-</html>
