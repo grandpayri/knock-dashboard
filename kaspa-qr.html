@@ -23,7 +23,7 @@
             </div>
             
             <div class="flex items-center space-x-2 bg-slate-950 px-3 py-1 rounded-xl border border-slate-800 text-xs">
-                <span class="text-slate-400">Version <span id="version-display" class="font-mono text-kaspa font-semibold">6</span></span>
+                <span class="text-slate-400">Version <span id="version-display" class="font-mono text-kaspa font-semibold">8</span></span>
             </div>
         </div>
     </header>
@@ -71,13 +71,13 @@
     </main>
 
     <footer class="text-center py-4 text-xs text-slate-500 border-t border-slate-800 bg-slate-950/20">
-        <p>Production Environment • Direct Swagger API Integration</p>
+        <p>Production Environment • Hybrid Script Pipeline Architecture</p>
     </footer>
 
     <script>
         (function() {
             // Hardcoded internally to track version history delivery across deployments
-            const DEPLOYED_VERSION = "6";
+            const DEPLOYED_VERSION = "8";
             
             // DOM Elements
             const addressInput = document.getElementById('address');
@@ -128,20 +128,158 @@
                 }
             }
 
-            // --- Exact KNS API Swagger Implementation ---
+            // --- Robust Anti-CORS Hybrid Pipeline Resolver ---
             async function resolveKNSName(domainName) {
                 statusLabel.textContent = "Querying Indexer...";
                 errorMsg.classList.add('hidden');
 
+                // Generate a clear layout string target matching your verified curl response path
+                const targetUrl = `https://api.knsdomains.org/mainnet/api/v1/${encodeURIComponent(domainName)}/owner`;
+
+                // Pipeline Route 1: High-speed proxy container bypass configuration
                 try {
-                    // Path formatting strictly aligned with verified endpoint request URL
-                    const response = await fetch(`https://api.knsdomains.org/mainnet/api/v1/${encodeURIComponent(domainName)}/owner`, {
-                        method: 'GET',
-                        headers: {
-                            'accept': 'application/json'
-                        }
-                    });
+                    const response = await fetch(`https://corsproxy.io/?${encodeURIComponent(targetUrl)}`);
+                    if (!response.ok) throw new Error("Proxy connection dropped");
                     
-                    if (!response.ok) {
-                        if (response.status === 404) {
-                            throw new Error("Unregistered");
+                    const payload = await response.json();
+                    
+                    if (payload && payload.success === true && payload.data && payload.data.owner) {
+                        statusLabel.textContent = "Resolved ✓";
+                        generateQR(payload.data.owner);
+                        return; // Successfully processed and finished execution line
+                    }
+                } catch (e) {
+                    // Failover silently to Route 2 if the proxy wrapper experiences load lags
+                    console.log("Primary fetch blocked or timed out, executing clean failover route...");
+                }
+
+                // Pipeline Route 2: Open origin-mirror backup calculation layer
+                try {
+                    const response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`);
+                    if (!response.ok) throw new Error("Failover route offline");
+                    
+                    const wrapper = await response.json();
+                    if (!wrapper.contents) throw new Error("Empty wrapper");
+                    
+                    const payload = JSON.parse(wrapper.contents);
+                    if (payload && payload.success === true && payload.data && payload.data.owner) {
+                        statusLabel.textContent = "Resolved ✓";
+                        generateQR(payload.data.owner);
+                        return;
+                    }
+                } catch (err) {
+                    // Catch block execution logic triggered if both channels hit rate-limiting blocks
+                    statusLabel.textContent = "KNS Failed";
+                    statusLabel.classList.remove('text-kaspa');
+                    statusLabel.classList.add('text-rose-400');
+                    
+                    errorMsg.textContent = "CORS block detected. If the domain is valid, wait a moment and try re-typing.";
+                    errorMsg.classList.remove('hidden');
+                    resetDisplay();
+                }
+            }
+
+            // --- Direct-Draw Canvas Core ---
+            function generateQR(qrPayload) {
+                rawUriDisplay.textContent = qrPayload;
+                rawUriDisplay.title = qrPayload;
+
+                secretQrContainer.innerHTML = ""; 
+                new QRCode(secretQrContainer, {
+                    text: qrPayload,
+                    width: 160,
+                    height: 160,
+                    colorDark: "#020617",
+                    colorLight: "#ffffff",
+                    correctLevel: QRCode.CorrectLevel.H
+                });
+
+                let checkAttempts = 0;
+                const extractAndDrawLoop = setInterval(() => {
+                    const generatedImg = secretQrContainer.querySelector('img');
+                    checkAttempts++;
+
+                    if ((generatedImg && generatedImg.src) || checkAttempts > 20) {
+                        clearInterval(extractAndDrawLoop);
+                        if (generatedImg && generatedImg.src) {
+                            drawBrandedCanvas(generatedImg);
+                        }
+                    }
+                }, 25);
+            }
+
+            function drawBrandedCanvas(imgElement) {
+                const ctx = qrCanvas.getContext('2d');
+                ctx.clearRect(0, 0, 160, 160);
+                ctx.drawImage(imgElement, 0, 0, 160, 160);
+
+                const center = 160 / 2;
+                const badgeSize = 38; 
+                const radius = 6;     
+
+                ctx.fillStyle = "#ffffff";
+                ctx.beginPath();
+                ctx.moveTo(center - badgeSize/2 + radius, center - badgeSize/2);
+                ctx.lineTo(center + badgeSize/2 - radius, center - badgeSize/2);
+                ctx.quadraticCurveTo(center + badgeSize/2, center - badgeSize/2, center + badgeSize/2, center - badgeSize/2 + radius);
+                ctx.lineTo(center + badgeSize/2, center + badgeSize/2 - radius);
+                ctx.quadraticCurveTo(center + badgeSize/2, center + badgeSize/2, center + badgeSize/2 - radius, center + badgeSize/2);
+                ctx.lineTo(center - badgeSize/2 + radius, center + badgeSize/2);
+                ctx.quadraticCurveTo(center - badgeSize/2, center + badgeSize/2, center - badgeSize/2, center + badgeSize/2 - radius);
+                ctx.lineTo(center - badgeSize/2, center - badgeSize/2 + radius);
+                ctx.quadraticCurveTo(center - badgeSize/2, center - badgeSize/2, center - badgeSize/2 + radius, center - badgeSize/2);
+                ctx.closePath();
+                ctx.fill();
+
+                const innerCircleRadius = 14;
+                ctx.fillStyle = "#70C4B4"; 
+                ctx.beginPath();
+                ctx.arc(center, center, innerCircleRadius, 0, 2 * Math.PI);
+                ctx.fill();
+
+                ctx.fillStyle = "#0f172a"; 
+                ctx.font = "bold 18px sans-serif";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText("𐤋", center, center + 1); 
+
+                qrPlaceholder.classList.add('hidden');
+                qrCanvas.classList.remove('hidden');
+                setBtnDisabled(false);
+            }
+
+            function resetDisplay() {
+                qrPlaceholder.classList.remove('hidden');
+                qrCanvas.classList.add('hidden');
+                rawUriDisplay.textContent = "";
+                setBtnDisabled(true);
+            }
+
+            function setBtnDisabled(isDisabled) {
+                downloadBtn.disabled = isDisabled;
+                if (isDisabled) {
+                    downloadBtn.classList.remove('bg-kaspa', 'hover:bg-[#5bb3a2]', 'text-slate-900');
+                    downloadBtn.classList.add('bg-slate-700', 'text-slate-400');
+                } else {
+                    downloadBtn.classList.remove('bg-slate-700', 'text-slate-400');
+                    downloadBtn.classList.add('bg-kaspa', 'hover:bg-[#5bb3a2]', 'text-slate-900');
+                }
+            }
+
+            downloadBtn.addEventListener('click', () => {
+                if (qrCanvas.classList.contains('hidden')) return;
+                
+                const dataUrl = qrCanvas.toDataURL("image/png");
+                const link = document.createElement('a');
+                link.href = dataUrl;
+                link.download = `kaspa-qr-v${DEPLOYED_VERSION}.png`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            });
+
+            addressInput.addEventListener('input', evaluateInput);
+        })();
+    </script>
+</body>
+</html>
