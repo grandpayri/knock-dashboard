@@ -7,7 +7,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
-        /* Extra custom accent color branding for Kaspa (#70C4B4) */
         .bg-kaspa { background-color: #70C4B4; }
         .text-kaspa { color: #70C4B4; }
         .border-kaspa { border-color: #70C4B4; }
@@ -22,7 +21,11 @@
                 <div class="w-8 h-8 rounded-full bg-kaspa flex items-center justify-center font-bold text-slate-900">𐤋</div>
                 <h1 class="text-xl font-bold tracking-tight">Kaspa <span class="text-kaspa">QR Gen</span></h1>
             </div>
-            <span class="text-xs text-slate-400 bg-slate-800 px-2.5 py-1 rounded-full border border-slate-700">100% Client-Side</span>
+            
+            <div class="flex items-center space-x-2 bg-slate-950 px-3 py-1 rounded-xl border border-slate-800 text-xs">
+                <span class="text-slate-400">v<span id="version-display">1.0.0</span></span>
+                <button id="increment-btn" class="text-kaspa hover:text-white font-bold px-1 transition cursor-pointer" title="Increment Patch Version">+</button>
+            </div>
         </div>
     </header>
 
@@ -77,7 +80,7 @@
                 <button 
                     id="download-btn"
                     disabled
-                    class="w-full py-3 bg-slate-700 hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed text-slate-900 font-medium rounded-xl transition shadow-lg cursor-pointer flex justify-center items-center gap-2"
+                    class="w-full py-3 bg-slate-700 text-slate-900 font-medium rounded-xl transition shadow-lg cursor-pointer flex justify-center items-center gap-2"
                 >
                     Save QR Code Image
                 </button>
@@ -90,102 +93,121 @@
     </footer>
 
     <script>
-        const addressInput = document.getElementById('address');
-        const amountInput = document.getElementById('amount');
-        const labelInput = document.getElementById('label');
-        const errorMsg = document.getElementById('error-msg');
-        const qrContainer = document.getElementById('qrcode');
-        const rawUriDisplay = document.getElementById('raw-uri');
-        const downloadBtn = document.getElementById('download-btn');
+        (function() {
+            // DOM Elements
+            const addressInput = document.getElementById('address');
+            const amountInput = document.getElementById('amount');
+            const labelInput = document.getElementById('label');
+            const errorMsg = document.getElementById('error-msg');
+            const qrContainer = document.getElementById('qrcode');
+            const rawUriDisplay = document.getElementById('raw-uri');
+            const downloadBtn = document.getElementById('download-btn');
+            const versionDisplay = document.getElementById('version-display');
+            const incrementBtn = document.getElementById('increment-btn');
 
-        let qrInstance = null;
+            let qrInstance = null;
 
-        function updateQR() {
-            const rawAddress = addressInput.value.trim();
-            const amount = amountInput.value.trim();
-            const label = labelInput.value.trim();
+            // --- Version Incrementer Logic ---
+            // Pull persistent version cache out of localStorage, default to 1.0.0
+            let currentVersion = localStorage.getItem('kaspa_app_version') || '1.0.0';
+            versionDisplay.textContent = currentVersion;
 
-            // Early return baseline state clearing if input is empty
-            if (!rawAddress) {
-                qrContainer.innerHTML = '<span class="text-xs text-slate-500 italic">Waiting for valid address...</span>';
-                rawUriDisplay.textContent = "";
-                errorMsg.classList.add('hidden');
-                setBtnDisabled(true);
-                return;
-            }
-
-            // Validates strictly whether proper URI schema token structure exists 
-            if (!rawAddress.startsWith('kaspa:') && !rawAddress.startsWith('kaspatest:')) {
-                errorMsg.textContent = "Address must begin with 'kaspa:' or 'kaspatest:' scheme prefix.";
-                errorMsg.classList.remove('hidden');
-                qrContainer.innerHTML = '<span class="text-xs text-rose-400 font-medium">Invalid Address Format</span>';
-                rawUriDisplay.textContent = "";
-                setBtnDisabled(true);
-                return;
-            }
-
-            errorMsg.classList.add('hidden');
-
-            // Formulates standards-compliant BIP-21 standard formatting string payload
-            let qrPayload = rawAddress;
-            const params = [];
-            
-            if (amount && parseFloat(amount) > 0) {
-                params.push(`amount=${encodeURIComponent(amount)}`);
-            }
-            if (label) {
-                params.push(`label=${encodeURIComponent(label)}`);
-            }
-            if (params.length > 0) {
-                qrPayload += `?${params.join('&')}`;
-            }
-
-            // Output generated structural URI data for user transparency
-            rawUriDisplay.textContent = qrPayload;
-            rawUriDisplay.title = qrPayload;
-
-            // Generate/re-render QR module
-            qrContainer.innerHTML = ""; 
-            qrInstance = new QRCode(qrContainer, {
-                text: qrPayload,
-                width: 160,
-                height: 160,
-                colorDark: "#020617", // slate-950 contrast mapping
-                colorLight: "#ffffff",
-                correctLevel: QRCode.CorrectLevel.M
+            incrementBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                let parts = currentVersion.split('.').map(Number);
+                
+                // Safely increment patch version (1.0.0 -> 1.0.1)
+                parts[2] += 1; 
+                currentVersion = parts.join('.');
+                
+                // Persist state
+                localStorage.setItem('kaspa_app_version', currentVersion);
+                
+                // Update text node strictly without creating new layout markup mutations
+                versionDisplay.textContent = currentVersion;
             });
 
-            setBtnDisabled(false);
-        }
+            // --- QR Generator Logic ---
+            function updateQR() {
+                const rawAddress = addressInput.value.trim();
+                const amount = amountInput.value.trim();
+                const label = labelInput.value.trim();
 
-        function setBtnDisabled(isDisabled) {
-            downloadBtn.disabled = isDisabled;
-            if (isDisabled) {
-                downloadBtn.classList.remove('bg-kaspa', 'hover:bg-[#5bb3a2]');
-                downloadBtn.classList.add('bg-slate-700');
-            } else {
-                downloadBtn.classList.remove('bg-slate-700');
-                downloadBtn.classList.add('bg-kaspa', 'hover:bg-[#5bb3a2]');
+                if (!rawAddress) {
+                    qrContainer.innerHTML = '<span class="text-xs text-slate-500 italic">Waiting for valid address...</span>';
+                    rawUriDisplay.textContent = "";
+                    errorMsg.classList.add('hidden');
+                    setBtnDisabled(true);
+                    return;
+                }
+
+                if (!rawAddress.startsWith('kaspa:') && !rawAddress.startsWith('kaspatest:')) {
+                    errorMsg.textContent = "Address must begin with 'kaspa:' or 'kaspatest:' scheme prefix.";
+                    errorMsg.classList.remove('hidden');
+                    qrContainer.innerHTML = '<span class="text-xs text-rose-400 font-medium">Invalid Address Format</span>';
+                    rawUriDisplay.textContent = "";
+                    setBtnDisabled(true);
+                    return;
+                }
+
+                errorMsg.classList.add('hidden');
+
+                let qrPayload = rawAddress;
+                const params = [];
+                
+                if (amount && parseFloat(amount) > 0) {
+                    params.push(`amount=${encodeURIComponent(amount)}`);
+                }
+                if (label) {
+                    params.push(`label=${encodeURIComponent(label)}`);
+                }
+                if (params.length > 0) {
+                    qrPayload += `?${params.join('&')}`;
+                }
+
+                rawUriDisplay.textContent = qrPayload;
+                rawUriDisplay.title = qrPayload;
+
+                qrContainer.innerHTML = ""; 
+                qrInstance = new QRCode(qrContainer, {
+                    text: qrPayload,
+                    width: 160,
+                    height: 160,
+                    colorDark: "#020617",
+                    colorLight: "#ffffff",
+                    correctLevel: QRCode.CorrectLevel.M
+                });
+
+                setBtnDisabled(false);
             }
-        }
 
-        // Extracts nested image file stream generated inside DOM layout to trigger physical canvas saves
-        downloadBtn.addEventListener('click', () => {
-            const img = qrContainer.querySelector('img');
-            if (img && img.src) {
-                const link = document.createElement('a');
-                link.href = img.src;
-                link.download = `kaspa-qr-${Date.now()}.png`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
+            function setBtnDisabled(isDisabled) {
+                downloadBtn.disabled = isDisabled;
+                if (isDisabled) {
+                    downloadBtn.classList.remove('bg-kaspa', 'hover:bg-[#5bb3a2]', 'text-slate-900');
+                    downloadBtn.classList.add('bg-slate-700', 'text-slate-400');
+                } else {
+                    downloadBtn.classList.remove('bg-slate-700', 'text-slate-400');
+                    downloadBtn.classList.add('bg-kaspa', 'hover:bg-[#5bb3a2]', 'text-slate-900');
+                }
             }
-        });
 
-        // Event hooks tracking state manipulation
-        addressInput.addEventListener('input', updateQR);
-        amountInput.addEventListener('input', updateQR);
-        labelInput.addEventListener('input', updateQR);
+            downloadBtn.addEventListener('click', () => {
+                const img = qrContainer.querySelector('img');
+                if (img && img.src) {
+                    const link = document.createElement('a');
+                    link.href = img.src;
+                    link.download = `kaspa-qr-${currentVersion}.png`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                }
+            });
+
+            addressInput.addEventListener('input', updateQR);
+            amountInput.addEventListener('input', updateQR);
+            labelInput.addEventListener('input', updateQR);
+        })();
     </script>
 </body>
 </html>
