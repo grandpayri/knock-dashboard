@@ -23,7 +23,7 @@
             </div>
             
             <div class="flex items-center space-x-2 bg-slate-950 px-3 py-1 rounded-xl border border-slate-800 text-xs">
-                <span class="text-slate-400">Version <span id="version-display" class="font-mono text-kaspa font-semibold">15</span></span>
+                <span class="text-slate-400">Version <span id="version-display" class="font-mono text-kaspa font-semibold">16</span></span>
             </div>
         </div>
     </header>
@@ -81,7 +81,7 @@
     <script>
         (function() {
             // Hardcoded internally to track version history delivery across deployments
-            const DEPLOYED_VERSION = "15";
+            const DEPLOYED_VERSION = "16";
             
             // DOM Elements
             const addressInput = document.getElementById('address');
@@ -100,9 +100,10 @@
 
             // Pre-compile local logo asset image object
             const logoAsset = new Image();
+            // Fixed: Set cross-origin anonymity rules to bypass canvas tainting restrictions completely
+            logoAsset.crossOrigin = "anonymous";
             logoAsset.src = "logo.png";
 
-            // Fixed: Moved the debounce token initialization back up to the top of the module scope
             let typingDebounceTimeout = null;
 
             function evaluateInput() {
@@ -141,7 +142,7 @@
 
             // --- Robust Anti-CORS Hybrid Pipeline Resolver ---
             async function resolveKNSName(domainName) {
-                statusLabel.textContent = "Querying Indexer... ";
+                statusLabel.textContent = "Querying Indexer...";
                 errorMsg.classList.add('hidden');
 
                 const targetUrl = `https://api.knsdomains.org/mainnet/api/v1/${encodeURIComponent(domainName)}/owner`;
@@ -159,4 +160,148 @@
                         generateQR(payload.data.owner);
                         return;
                     }
-                } catch (e)
+                } catch (e) {
+                    console.log("Primary proxy blocked or timed out, failing over...");
+                }
+
+                try {
+                    const response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`);
+                    if (!response.ok) throw new Error("Failover offline");
+                    
+                    const wrapper = await response.json();
+                    if (!wrapper.contents) throw new Error("Empty wrapper");
+                    
+                    const payload = JSON.parse(wrapper.contents);
+                    if (payload && payload.success === true && payload.data && payload.data.owner) {
+                        statusLabel.textContent = "Resolved ✓";
+                        knsUriDisplay.textContent = domainName;
+                        knsUriDisplay.classList.remove('hidden');
+                        generateQR(payload.data.owner);
+                        return;
+                    }
+                } catch (err) {
+                    statusLabel.textContent = "KNS Failed";
+                    statusLabel.classList.remove('text-kaspa');
+                    statusLabel.classList.add('text-rose-400');
+                    
+                    errorMsg.textContent = "CORS block detected. If the domain is valid, wait a moment and try re-typing.";
+                    errorMsg.classList.remove('hidden');
+                    resetDisplay();
+                }
+            }
+
+            function truncateAddress(address) {
+                if (!address) return "";
+                const prefix = address.startsWith("kaspatest:") ? "kaspatest:" : "kaspa:";
+                const cleanAddress = address.replace(prefix, "");
+                
+                if (cleanAddress.length <= 12) return address;
+
+                const start = cleanAddress.substring(0, 7);
+                const end = cleanAddress.substring(cleanAddress.length - 6);
+                
+                return `${prefix}${start}...${end}`;
+            }
+
+            // --- Direct-Draw Canvas Core ---
+            function generateQR(qrPayload) {
+                rawUriDisplay.textContent = truncateAddress(qrPayload);
+                rawUriDisplay.title = qrPayload;
+
+                secretQrContainer.innerHTML = ""; 
+                new QRCode(secretQrContainer, {
+                    text: qrPayload,
+                    width: 160,
+                    height: 160,
+                    colorDark: "#020617",
+                    colorLight: "#ffffff",
+                    correctLevel: QRCode.CorrectLevel.H
+                });
+
+                let checkAttempts = 0;
+                const extractAndDrawLoop = setInterval(() => {
+                    const generatedImg = secretQrContainer.querySelector('img');
+                    checkAttempts++;
+
+                    if ((generatedImg && generatedImg.src) || checkAttempts > 20) {
+                        clearInterval(extractAndDrawLoop);
+                        if (generatedImg && generatedImg.src) {
+                            drawBrandedCanvas(generatedImg);
+                        }
+                    }
+                }, 25);
+            }
+
+            function drawBrandedCanvas(imgElement) {
+                const ctx = qrCanvas.getContext('2d');
+                ctx.clearRect(0, 0, 160, 160);
+                ctx.drawImage(imgElement, 0, 0, 160, 160);
+
+                const center = 160 / 2;
+                const badgeSize = 38; 
+                const radius = 6;     
+
+                ctx.fillStyle = "#ffffff";
+                ctx.beginPath();
+                ctx.moveTo(center - badgeSize/2 + radius, center - badgeSize/2);
+                ctx.lineTo(center + badgeSize/2 - radius, center - badgeSize/2);
+                ctx.quadraticCurveTo(center + badgeSize/2, center - badgeSize/2, center + badgeSize/2, center - badgeSize/2 + radius);
+                ctx.lineTo(center + badgeSize/2, center + badgeSize/2 - radius);
+                ctx.quadraticCurveTo(center + badgeSize/2, center + badgeSize/2, center + badgeSize/2 - radius, center + badgeSize/2);
+                ctx.lineTo(center - badgeSize/2 + radius, center + badgeSize/2);
+                ctx.quadraticCurveTo(center - badgeSize/2, center + badgeSize/2, center - badgeSize/2, center + badgeSize/2 - radius);
+                ctx.lineTo(center - badgeSize/2, center - badgeSize/2 + radius);
+                ctx.quadraticCurveTo(center - badgeSize/2, center - badgeSize/2, center - badgeSize/2 + radius, center - badgeSize/2);
+                ctx.closePath();
+                ctx.fill();
+
+                const logoDimensions = 32; 
+                ctx.drawImage(
+                    logoAsset, 
+                    center - logoDimensions / 2, 
+                    center - logoDimensions / 2, 
+                    logoDimensions, 
+                    logoDimensions
+                );
+
+                qrPlaceholder.classList.add('hidden');
+                qrCanvas.classList.remove('hidden');
+                setBtnDisabled(false);
+            }
+
+            function resetDisplay() {
+                qrPlaceholder.classList.remove('hidden');
+                qrCanvas.classList.add('hidden');
+                rawUriDisplay.textContent = "";
+                knsUriDisplay.classList.add('hidden');
+                setBtnDisabled(true);
+            }
+
+            function setBtnDisabled(isDisabled) {
+                downloadBtn.disabled = isDisabled;
+                if (isDisabled) {
+                    downloadBtn.classList.remove('bg-kaspa', 'hover:bg-[#5bb3a2]', 'text-slate-900');
+                    downloadBtn.classList.add('bg-slate-700', 'text-slate-400');
+                } else {
+                    downloadBtn.classList.remove('bg-slate-700', 'text-slate-400');
+                    downloadBtn.classList.add('bg-kaspa', 'hover:bg-[#5bb3a2]', 'text-slate-900');
+                }
+            }
+
+            downloadBtn.addEventListener('click', () => {
+                if (qrCanvas.classList.contains('hidden')) return;
+                
+                const dataUrl = qrCanvas.toDataURL("image/png");
+                const link = document.createElement('a');
+                link.href = dataUrl;
+                link.download = `kaspa-qr-v${DEPLOYED_VERSION}.png`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            });
+
+            addressInput.addEventListener('input', evaluateInput);
+        })();
+    </script>
+</body>
+</html>
