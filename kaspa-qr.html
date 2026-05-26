@@ -33,7 +33,7 @@
         <div class="bg-slate-800/60 border border-slate-700/60 p-6 rounded-2xl shadow-xl w-full max-w-md backdrop-blur-md">
             
             <h2 class="text-lg font-semibold text-white mb-2">Generate Address QR</h2>
-            <p class="text-sm text-slate-400 mb-6">Enter your mainnet or testnet address to create a scannable payment target.</p>
+            <p class="text-sm text-slate-400 mb-6">Enter your mainnet or testnet address to generate a branded scannable payload.</p>
 
             <div class="space-y-5">
                 <div>
@@ -47,32 +47,12 @@
                     <p id="error-msg" class="text-xs text-rose-400 mt-1.5 hidden"></p>
                 </div>
 
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label for="amount" class="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Amount (Optional)</label>
-                        <input 
-                            type="number" 
-                            id="amount" 
-                            step="any"
-                            min="0"
-                            class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus-kaspa transition"
-                            placeholder="e.g. 150"
-                        />
-                    </div>
-                    <div>
-                        <label for="label" class="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Notes/Label (Optional)</label>
-                        <input 
-                            type="text" 
-                            id="label" 
-                            class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus-kaspa transition"
-                            placeholder="e.g. Donation"
-                        />
-                    </div>
-                </div>
+                <div id="qrcode-secret" class="hidden"></div>
 
                 <div class="flex flex-col items-center justify-center py-4 bg-slate-950/40 rounded-xl border border-slate-800">
-                    <div id="qrcode" class="bg-white p-3 rounded-lg shadow-inner min-h-[152px] flex items-center justify-center">
-                        <span class="text-xs text-slate-500 italic">Waiting for valid address...</span>
+                    <div class="bg-white p-3 rounded-lg shadow-inner min-h-[184px] min-w-[184px] flex items-center justify-center">
+                        <canvas id="qr-canvas" width="160" height="160" class="hidden"></canvas>
+                        <div id="qr-placeholder" class="text-xs text-slate-500 italic">Waiting for valid address...</div>
                     </div>
                     <div id="raw-uri" class="text-[10px] text-slate-500 font-mono mt-3 px-4 truncate max-w-xs text-center"></div>
                 </div>
@@ -80,9 +60,9 @@
                 <button 
                     id="download-btn"
                     disabled
-                    class="w-full py-3 bg-slate-700 text-slate-900 font-medium rounded-xl transition shadow-lg cursor-pointer flex justify-center items-center gap-2"
+                    class="w-full py-3 bg-slate-700 text-slate-400 font-medium rounded-xl transition shadow-lg cursor-pointer flex justify-center items-center gap-2"
                 >
-                    Save QR Code Image
+                    Save Branded QR Code
                 </button>
             </div>
         </div>
@@ -96,118 +76,68 @@
         (function() {
             // DOM Elements
             const addressInput = document.getElementById('address');
-            const amountInput = document.getElementById('amount');
-            const labelInput = document.getElementById('label');
             const errorMsg = document.getElementById('error-msg');
-            const qrContainer = document.getElementById('qrcode');
+            const secretQrContainer = document.getElementById('qrcode-secret');
+            const qrCanvas = document.getElementById('qr-canvas');
+            const qrPlaceholder = document.getElementById('qr-placeholder');
             const rawUriDisplay = document.getElementById('raw-uri');
             const downloadBtn = document.getElementById('download-btn');
             const versionDisplay = document.getElementById('version-display');
             const incrementBtn = document.getElementById('increment-btn');
 
-            let qrInstance = null;
-
-            // --- Version Incrementer Logic ---
-            // Pull persistent version cache out of localStorage, default to 1.0.0
+            // Set up local state cache tracking
             let currentVersion = localStorage.getItem('kaspa_app_version') || '1.0.0';
             versionDisplay.textContent = currentVersion;
 
+            // Version increment function
             incrementBtn.addEventListener('click', (e) => {
                 e.preventDefault();
                 let parts = currentVersion.split('.').map(Number);
-                
-                // Safely increment patch version (1.0.0 -> 1.0.1)
                 parts[2] += 1; 
                 currentVersion = parts.join('.');
-                
-                // Persist state
                 localStorage.setItem('kaspa_app_version', currentVersion);
-                
-                // Update text node strictly without creating new layout markup mutations
                 versionDisplay.textContent = currentVersion;
             });
 
-            // --- QR Generator Logic ---
+            // Composite layout processing engine
             function updateQR() {
-                const rawAddress = addressInput.value.trim();
-                const amount = amountInput.value.trim();
-                const label = labelInput.value.trim();
+                const qrPayload = addressInput.value.trim();
 
-                if (!rawAddress) {
-                    qrContainer.innerHTML = '<span class="text-xs text-slate-500 italic">Waiting for valid address...</span>';
+                if (!qrPayload) {
+                    qrPlaceholder.classList.remove('hidden');
+                    qrCanvas.classList.add('hidden');
                     rawUriDisplay.textContent = "";
                     errorMsg.classList.add('hidden');
                     setBtnDisabled(true);
                     return;
                 }
 
-                if (!rawAddress.startsWith('kaspa:') && !rawAddress.startsWith('kaspatest:')) {
+                if (!qrPayload.startsWith('kaspa:') && !qrPayload.startsWith('kaspatest:')) {
                     errorMsg.textContent = "Address must begin with 'kaspa:' or 'kaspatest:' scheme prefix.";
                     errorMsg.classList.remove('hidden');
-                    qrContainer.innerHTML = '<span class="text-xs text-rose-400 font-medium">Invalid Address Format</span>';
+                    qrPlaceholder.classList.remove('hidden');
+                    qrCanvas.classList.add('hidden');
                     rawUriDisplay.textContent = "";
                     setBtnDisabled(true);
                     return;
                 }
 
                 errorMsg.classList.add('hidden');
-
-                let qrPayload = rawAddress;
-                const params = [];
-                
-                if (amount && parseFloat(amount) > 0) {
-                    params.push(`amount=${encodeURIComponent(amount)}`);
-                }
-                if (label) {
-                    params.push(`label=${encodeURIComponent(label)}`);
-                }
-                if (params.length > 0) {
-                    qrPayload += `?${params.join('&')}`;
-                }
-
                 rawUriDisplay.textContent = qrPayload;
                 rawUriDisplay.title = qrPayload;
 
-                qrContainer.innerHTML = ""; 
-                qrInstance = new QRCode(qrContainer, {
+                // 1. Render raw QR matrix down to hidden background DOM Node
+                secretQrContainer.innerHTML = ""; 
+                new QRCode(secretQrContainer, {
                     text: qrPayload,
                     width: 160,
                     height: 160,
-                    colorDark: "#020617",
+                    colorDark: "#020617", // slate-950 matching
                     colorLight: "#ffffff",
-                    correctLevel: QRCode.CorrectLevel.M
+                    correctLevel: QRCode.CorrectLevel.H // Forced High Level data correction redundancy for logo padding space
                 });
 
-                setBtnDisabled(false);
-            }
-
-            function setBtnDisabled(isDisabled) {
-                downloadBtn.disabled = isDisabled;
-                if (isDisabled) {
-                    downloadBtn.classList.remove('bg-kaspa', 'hover:bg-[#5bb3a2]', 'text-slate-900');
-                    downloadBtn.classList.add('bg-slate-700', 'text-slate-400');
-                } else {
-                    downloadBtn.classList.remove('bg-slate-700', 'text-slate-400');
-                    downloadBtn.classList.add('bg-kaspa', 'hover:bg-[#5bb3a2]', 'text-slate-900');
-                }
-            }
-
-            downloadBtn.addEventListener('click', () => {
-                const img = qrContainer.querySelector('img');
-                if (img && img.src) {
-                    const link = document.createElement('a');
-                    link.href = img.src;
-                    link.download = `kaspa-qr-${currentVersion}.png`;
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                }
-            });
-
-            addressInput.addEventListener('input', updateQR);
-            amountInput.addEventListener('input', updateQR);
-            labelInput.addEventListener('input', updateQR);
-        })();
-    </script>
-</body>
-</html>
+                // 2. Wait briefly for internal image translation engine to settle, then draw to UI canvas
+                setTimeout(() => {
+                    const generatedImg = secretQrContainer.querySelector('img');
+                    if
