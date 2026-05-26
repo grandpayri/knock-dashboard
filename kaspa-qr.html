@@ -23,7 +23,7 @@
             </div>
             
             <div class="flex items-center space-x-2 bg-slate-950 px-3 py-1 rounded-xl border border-slate-800 text-xs">
-                <span class="text-slate-400">Version <span id="version-display" class="font-mono text-kaspa font-semibold">11</span></span>
+                <span class="text-slate-400">Version <span id="version-display" class="font-mono text-kaspa font-semibold">12</span></span>
             </div>
         </div>
     </header>
@@ -71,13 +71,13 @@
     </main>
 
     <footer class="text-center py-4 text-xs text-slate-500 border-t border-slate-800 bg-slate-950/20">
-        <p>Production Environment • Inline Data URI Brand Injection</p>
+        <p>Production Environment • Localized Same-Origin Brand Asset Architecture</p>
     </footer>
 
     <script>
         (function() {
             // Hardcoded internally to track version history delivery across deployments
-            const DEPLOYED_VERSION = "11";
+            const DEPLOYED_VERSION = "12";
             
             // DOM Elements
             const addressInput = document.getElementById('address');
@@ -93,9 +93,9 @@
             // Force internal state layout reflection instantly on load
             versionDisplay.textContent = DEPLOYED_VERSION;
 
-            // Pre-compile official Kaspa Logo Asset to Data URI to prevent canvas export restrictions
+            // Pre-compile the local logo asset from the same root origin directory path
             const logoAsset = new Image();
-            logoAsset.src = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 76 76'><rect width='76' height='76' rx='38' fill='%2370C4B4'/><path d='M47.7 24.3h5.9L39.2 51.7h-5.9z' fill='%23020617'/><path d='M22.4 24.3h5.9L13.9 51.7H8z' fill='%23020617'/><path d='M28.4 35.1h19.2v5.3H28.4z' fill='%23020617'/></svg>";
+            logoAsset.src = "logo.png";
 
             let typingDebounceTimeout = null;
 
@@ -244,7 +244,7 @@
                 ctx.closePath();
                 ctx.fill();
 
-                // Render the local Base64 official logo image directly over the center pixels
+                // Render the newly localized repository asset directly over the middle canvas layer coordinates
                 const logoDimensions = 32; 
                 ctx.drawImage(
                     logoAsset, 
