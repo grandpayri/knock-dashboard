@@ -23,8 +23,7 @@
             </div>
             
             <div class="flex items-center space-x-2 bg-slate-950 px-3 py-1 rounded-xl border border-slate-800 text-xs">
-                <span class="text-slate-400">Version <span id="version-display">1</span></span>
-                <button id="increment-btn" class="text-kaspa hover:text-white font-bold px-1 transition cursor-pointer" title="Increment Version Step">+</button>
+                <span class="text-slate-400">Version <span id="version-display" class="font-mono text-kaspa font-semibold">3</span></span>
             </div>
         </div>
     </header>
@@ -77,6 +76,9 @@
 
     <script>
         (function() {
+            // Hardcoded internally to track version history delivery across deployments
+            const DEPLOYED_VERSION = "3";
+            
             // DOM Elements
             const addressInput = document.getElementById('address');
             const errorMsg = document.getElementById('error-msg');
@@ -87,19 +89,11 @@
             const rawUriDisplay = document.getElementById('raw-uri');
             const downloadBtn = document.getElementById('download-btn');
             const versionDisplay = document.getElementById('version-display');
-            const incrementBtn = document.getElementById('increment-btn');
 
-            let currentVersion = parseInt(localStorage.getItem('kaspa_simple_version') || '1', 10);
-            versionDisplay.textContent = currentVersion;
+            // Force internal state layout reflection instantly on compilation loops
+            versionDisplay.textContent = DEPLOYED_VERSION;
 
             let typingDebounceTimeout = null;
-
-            incrementBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                currentVersion += 1;
-                localStorage.setItem('kaspa_simple_version', currentVersion);
-                versionDisplay.textContent = currentVersion;
-            });
 
             function evaluateInput() {
                 clearTimeout(typingDebounceTimeout);
@@ -134,13 +128,12 @@
                 }
             }
 
-            // --- Fixed Production KNS Live Resolution Core ---
+            // --- Live Production KNS Resolution Core ---
             async function resolveKNSName(domainName) {
                 statusLabel.textContent = "Querying Indexer...";
                 errorMsg.classList.add('hidden');
 
                 try {
-                    // Pings the live KNS indexer registry gateway architecture
                     const response = await fetch(`https://api.knsdomains.org/mainnet/api/v1/domain/${encodeURIComponent(domainName)}`);
                     
                     if (!response.ok) {
@@ -152,7 +145,6 @@
                     
                     const data = await response.json();
                     
-                    // Extract owner cryptographic address from database layer payload parameters
                     if (data && data.owner) {
                         statusLabel.textContent = "Resolved ✓";
                         generateQR(data.owner);
@@ -266,7 +258,7 @@
                 const dataUrl = qrCanvas.toDataURL("image/png");
                 const link = document.createElement('a');
                 link.href = dataUrl;
-                link.download = `kaspa-qr-v${currentVersion}.png`;
+                link.download = `kaspa-qr-v${DEPLOYED_VERSION}.png`;
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
