@@ -23,8 +23,8 @@
             </div>
             
             <div class="flex items-center space-x-2 bg-slate-950 px-3 py-1 rounded-xl border border-slate-800 text-xs">
-                <span class="text-slate-400">v<span id="version-display">1.0.0</span></span>
-                <button id="increment-btn" class="text-kaspa hover:text-white font-bold px-1 transition cursor-pointer" title="Increment Patch Version">+</button>
+                <span class="text-slate-400">Version <span id="version-display">1</span></span>
+                <button id="increment-btn" class="text-kaspa hover:text-white font-bold px-1 transition cursor-pointer" title="Increment Version Step">+</button>
             </div>
         </div>
     </header>
@@ -85,40 +85,31 @@
             const versionDisplay = document.getElementById('version-display');
             const incrementBtn = document.getElementById('increment-btn');
 
-            // Set up local state cache tracking
-            let currentVersion = localStorage.getItem('kaspa_app_version') || '1.0.0';
+            // --- Simplified Integer Version Handling ---
+            let currentVersion = parseInt(localStorage.getItem('kaspa_simple_version') || '1', 10);
             versionDisplay.textContent = currentVersion;
 
-            // Version increment function
             incrementBtn.addEventListener('click', (e) => {
                 e.preventDefault();
-                let parts = currentVersion.split('.').map(Number);
-                parts[2] += 1; 
-                currentVersion = parts.join('.');
-                localStorage.setItem('kaspa_app_version', currentVersion);
+                currentVersion += 1;
+                localStorage.setItem('kaspa_simple_version', currentVersion);
                 versionDisplay.textContent = currentVersion;
             });
 
-            // Composite layout processing engine
+            // --- Bulletproof Direct-Draw QR Engine ---
             function updateQR() {
                 const qrPayload = addressInput.value.trim();
 
+                // Validation reset rules
                 if (!qrPayload) {
-                    qrPlaceholder.classList.remove('hidden');
-                    qrCanvas.classList.add('hidden');
-                    rawUriDisplay.textContent = "";
-                    errorMsg.classList.add('hidden');
-                    setBtnDisabled(true);
+                    resetDisplay();
                     return;
                 }
 
                 if (!qrPayload.startsWith('kaspa:') && !qrPayload.startsWith('kaspatest:')) {
                     errorMsg.textContent = "Address must begin with 'kaspa:' or 'kaspatest:' scheme prefix.";
                     errorMsg.classList.remove('hidden');
-                    qrPlaceholder.classList.remove('hidden');
-                    qrCanvas.classList.add('hidden');
-                    rawUriDisplay.textContent = "";
-                    setBtnDisabled(true);
+                    resetDisplay();
                     return;
                 }
 
@@ -126,18 +117,116 @@
                 rawUriDisplay.textContent = qrPayload;
                 rawUriDisplay.title = qrPayload;
 
-                // 1. Render raw QR matrix down to hidden background DOM Node
+                // 1. Wipe and re-instantiate base generation inside hidden scratch buffer
                 secretQrContainer.innerHTML = ""; 
-                new QRCode(secretQrContainer, {
+                
+                const qrEngine = new QRCode(secretQrContainer, {
                     text: qrPayload,
                     width: 160,
                     height: 160,
-                    colorDark: "#020617", // slate-950 matching
+                    colorDark: "#020617",
                     colorLight: "#ffffff",
-                    correctLevel: QRCode.CorrectLevel.H // Forced High Level data correction redundancy for logo padding space
+                    correctLevel: QRCode.CorrectLevel.H // Uses High Error Correction to protect tracking against center logos
                 });
 
-                // 2. Wait briefly for internal image translation engine to settle, then draw to UI canvas
-                setTimeout(() => {
+                // 2. Extract image via dynamic loop checks to handle slower devices safely
+                let checkAttempts = 0;
+                const extractAndDrawLoop = setInterval(() => {
                     const generatedImg = secretQrContainer.querySelector('img');
-                    if
+                    checkAttempts++;
+
+                    // If image is ready OR if we timed out, execute draw routines
+                    if (generatedImg && generatedImg.src || checkAttempts > 20) {
+                        clearInterval(extractAndDrawLoop);
+                        
+                        if (generatedImg && generatedImg.src) {
+                            drawBrandedCanvas(generatedImg);
+                        }
+                    }
+                }, 25);
+            }
+
+            function drawBrandedCanvas(imgElement) {
+                const ctx = qrCanvas.getContext('2d');
+                ctx.clearRect(0, 0, 160, 160);
+                
+                // Print basic barcode pattern matrix across target frame
+                ctx.drawImage(imgElement, 0, 0, 160, 160);
+
+                // --- Render Centered Kaspa Identity Badge ---
+                const center = 160 / 2;
+                const badgeSize = 38; 
+                const radius = 6;     
+
+                // Draw protective solid white padding container square
+                ctx.fillStyle = "#ffffff";
+                ctx.beginPath();
+                ctx.moveTo(center - badgeSize/2 + radius, center - badgeSize/2);
+                ctx.lineTo(center + badgeSize/2 - radius, center - badgeSize/2);
+                ctx.quadraticCurveTo(center + badgeSize/2, center - badgeSize/2, center + badgeSize/2, center - badgeSize/2 + radius);
+                ctx.lineTo(center + badgeSize/2, center + badgeSize/2 - radius);
+                ctx.quadraticCurveTo(center + badgeSize/2, center + badgeSize/2, center + badgeSize/2 - radius, center + badgeSize/2);
+                ctx.lineTo(center - badgeSize/2 + radius, center + badgeSize/2);
+                ctx.quadraticCurveTo(center - badgeSize/2, center + badgeSize/2, center - badgeSize/2, center + badgeSize/2 - radius);
+                ctx.lineTo(center - badgeSize/2, center - badgeSize/2 + radius);
+                ctx.quadraticCurveTo(center - badgeSize/2, center - badgeSize/2, center - badgeSize/2 + radius, center - badgeSize/2);
+                ctx.closePath();
+                ctx.fill();
+
+                // Draw inner core Kaspa branding color badge plate circles
+                const innerCircleRadius = 14;
+                ctx.fillStyle = "#70C4B4"; 
+                ctx.beginPath();
+                ctx.arc(center, center, innerCircleRadius, 0, 2 * Math.PI);
+                ctx.fill();
+
+                // Stamp Kaspa script Unicode icon safely centered on top
+                ctx.fillStyle = "#0f172a"; 
+                ctx.font = "bold 18px sans-serif";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText("𐤋", center, center + 1); 
+
+                // Unhide the UI elements safely
+                qrPlaceholder.classList.add('hidden');
+                qrCanvas.classList.remove('hidden');
+                setBtnDisabled(false);
+            }
+
+            function resetDisplay() {
+                qrPlaceholder.classList.remove('hidden');
+                qrCanvas.classList.add('hidden');
+                rawUriDisplay.textContent = "";
+                setBtnDisabled(true);
+            }
+
+            function setBtnDisabled(isDisabled) {
+                downloadBtn.disabled = isDisabled;
+                if (isDisabled) {
+                    downloadBtn.classList.remove('bg-kaspa', 'hover:bg-[#5bb3a2]', 'text-slate-900');
+                    downloadBtn.classList.add('bg-slate-700', 'text-slate-400');
+                } else {
+                    downloadBtn.classList.remove('bg-slate-700', 'text-slate-400');
+                    downloadBtn.classList.add('bg-kaspa', 'hover:bg-[#5bb3a2]', 'text-slate-900');
+                }
+            }
+
+            // Export logic handling native image data transfers
+            downloadBtn.addEventListener('click', () => {
+                if (qrCanvas.classList.contains('hidden')) return;
+                
+                const dataUrl = qrCanvas.toDataURL("image/png");
+                const link = document.createElement('a');
+                link.href = dataUrl;
+                link.download = `kaspa-qr-v${currentVersion}.png`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            });
+
+            // Watch for input configurations
+            addressInput.addEventListener('input', updateQR);
+        })();
+    </script>
+</body>
+</html>
