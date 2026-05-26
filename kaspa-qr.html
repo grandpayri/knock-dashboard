@@ -79,6 +79,7 @@
     </div>
 
     <script>
+        // Clean vector asset for the Kaspa logo icon overlay
         const kaspaLogoSrc = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100"><circle cx="50" cy="50" r="50" fill="%2370e3d4"/><path d="M25 50 L42 30 L55 30 L38 50 L55 70 L42 70 Z M48 50 L65 30 L78 30 L61 50 L78 70 L65 70 Z" fill="%230f172a"/></svg>`;
 
         async function handleGeneration() {
@@ -89,37 +90,43 @@
             }
 
             if (typeof QRCode === 'undefined') {
-                alert('Error: The QR Code library failed to load. Check your internet connection.');
+                alert('Error: The QR Code engine library failed to load. Please check connection.');
                 return;
             }
 
             setLoading(true);
             hideOutputs();
 
+            // Intercept .kas domains
             if (inputData.toLowerCase().endsWith('.kas')) {
                 try {
-                    const domainName = inputData.toLowerCase();
-                    const targetApiUrl = `https://api.knsdomains.org/mainnet/api/v1/domain/${domainName}`;
+                    // Normalize inputs for standard lookup formats
+                    let domainName = inputData.toLowerCase();
+                    if (!domainName.endsWith('.kas')) domainName += '.kas';
                     
-                    // Utilizing standard corsproxy.io wrapper to fetch cleanly from a local file layout
-                    const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetApiUrl)}`;
+                    // Directly query the public gateway indexer which permits all external web connections
+                    const response = await fetch(`https://api.kaspa.org/kns/domain/${domainName}`);
                     
-                    const response = await fetch(proxyUrl);
                     if (!response.ok) {
-                        throw new Error('Could not contact KNS server or domain does not exist.');
+                        throw new Error('This domain name was not found or has expired on-chain.');
                     }
                     
                     const data = await response.json();
                     
-                    if (data && data.owner) {
+                    // Route out the wallet payload mapping
+                    if (data && data.address) {
+                        inputData = data.address;
+                        document.getElementById('resolvedAddress').innerText = inputData;
+                        document.getElementById('metaContainer').classList.remove('hidden');
+                    } else if (data && data.owner) {
                         inputData = data.owner;
                         document.getElementById('resolvedAddress').innerText = inputData;
                         document.getElementById('metaContainer').classList.remove('hidden');
                     } else {
-                        throw new Error(`Domain "${domainName}" is registered but has no linked address profile.`);
+                        throw new Error(`Domain "${domainName}" found, but no target payment address is mapped.`);
                     }
                 } catch (error) {
-                    alert(`KNS Error: ${error.message}`);
+                    alert(`KNS Resolver Error: ${error.message}`);
                     setLoading(false);
                     return;
                 }
@@ -145,6 +152,7 @@
                     correctLevel: QRCode.CorrectLevel.H 
                 });
 
+                // Set short buffer timeout to guarantee standard output processing completion
                 setTimeout(() => {
                     const qrImg = qrDiv.querySelector('img');
                     if (!qrImg) {
@@ -174,7 +182,7 @@
                     };
                 }, 200);
             } catch (e) {
-                alert(`QR Draw Error: ${e.message}`);
+                alert(`Matrix Compiler Failure: ${e.message}`);
                 setLoading(false);
             }
         }
@@ -187,7 +195,7 @@
             if (isLoading) {
                 btn.disabled = true;
                 spinner.classList.remove('hidden');
-                text.innerText = "Resolving & Building...";
+                text.innerText = "Resolving Blockchain Data...";
             } else {
                 btn.disabled = false;
                 spinner.classList.add('hidden');
