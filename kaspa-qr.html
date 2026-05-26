@@ -3,219 +3,189 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaspa KNS & Address QR Generator</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Kaspa Wallet QR Code Generator</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
-        body {
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-        }
-        .kaspa-glow {
-            box-shadow: 0 0 20px rgba(112, 227, 212, 0.15);
-        }
-        .spinner {
-            border-top-color: #70e3d4;
-            animation: spinner 0.6s linear infinite;
-        }
-        @keyframes spinner {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
+        /* Extra custom accent color branding for Kaspa (#70C4B4) */
+        .bg-kaspa { background-color: #70C4B4; }
+        .text-kaspa { color: #70C4B4; }
+        .border-kaspa { border-color: #70C4B4; }
+        .focus-kaspa:focus { border-color: #70C4B4; box-shadow: 0 0 0 2px rgba(112, 196, 180, 0.2); }
     </style>
 </head>
-<body class="min-h-screen flex flex-col items-center justify-center p-6 text-slate-100">
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col justify-between font-sans">
 
-    <div class="w-full max-w-md bg-slate-900/80 border border-slate-800 rounded-2xl p-6 backdrop-blur-xl kaspa-glow">
-        <div class="text-center mb-6">
-            <h1 class="text-2xl font-bold tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-[#70e3d4] to-[#4fa89e]">
-                KASPA QR GENERATOR
-            </h1>
-            <p class="text-xs text-slate-400 mt-1">Supports addresses and KNS (.kas) domains</p>
-        </div>
-
-        <div class="space-y-4">
-            <div>
-                <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
-                    Wallet Address or KNS Domain
-                </label>
-                <input 
-                    type="text" 
-                    id="kasInput" 
-                    placeholder="e.g., name.kas or kaspa:qq..." 
-                    class="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl focus:outline-none focus:border-[#70e3d4] text-sm font-mono text-slate-200 transition-colors"
-                />
+    <header class="border-b border-slate-800 bg-slate-900/50 backdrop-blur px-6 py-4">
+        <div class="max-w-4xl mx-auto flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <div class="w-8 h-8 rounded-full bg-kaspa flex items-center justify-center font-bold text-slate-900">𐤋</div>
+                <h1 class="text-xl font-bold tracking-tight">Kaspa <span class="text-kaspa">QR Gen</span></h1>
             </div>
-
-            <button 
-                id="generateBtn"
-                onclick="handleGeneration()" 
-                class="w-full flex items-center justify-center py-3 bg-gradient-to-r from-[#70e3d4] to-[#4fa89e] text-slate-950 font-bold rounded-xl hover:opacity-90 transition-opacity uppercase tracking-wider text-sm"
-            >
-                <span id="btnText">Generate QR Code</span>
-                <div id="btnSpinner" class="spinner ease-linear rounded-full border-2 border-slate-950 h-4 w-4 ml-2 hidden"></div>
-            </button>
+            <span class="text-xs text-slate-400 bg-slate-800 px-2.5 py-1 rounded-full border border-slate-700">100% Client-Side</span>
         </div>
+    </header>
 
-        <div id="metaContainer" class="mt-4 p-3 bg-slate-950 border border-slate-800 rounded-xl text-center hidden">
-            <span class="block text-[10px] uppercase tracking-wider text-slate-400">Resolved Address</span>
-            <span id="resolvedAddress" class="text-xs font-mono text-[#70e3d4] break-all block mt-1"></span>
-        </div>
-
-        <div class="mt-6 flex flex-col items-center justify-center">
-            <div id="qrcode" class="hidden"></div>
+    <main class="flex-grow flex items-center justify-center p-4">
+        <div class="bg-slate-800/60 border border-slate-700/60 p-6 rounded-2xl shadow-xl w-full max-w-md backdrop-blur-md">
             
-            <div class="p-4 bg-white rounded-2xl shadow-xl border-4 border-[#70e3d4]/30 hidden" id="canvasContainer">
-                <canvas id="fancyCanvas" width="300" height="300" class="rounded-lg"></canvas>
+            <h2 class="text-lg font-semibold text-white mb-2">Generate Address QR</h2>
+            <p class="text-sm text-slate-400 mb-6">Enter your mainnet or testnet address to create a scannable payment target.</p>
+
+            <div class="space-y-5">
+                <div>
+                    <label for="address" class="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Kaspa Address</label>
+                    <textarea 
+                        id="address" 
+                        rows="3"
+                        class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus-kaspa transition resize-none"
+                        placeholder="kaspa:qqxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                    ></textarea>
+                    <p id="error-msg" class="text-xs text-rose-400 mt-1.5 hidden"></p>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label for="amount" class="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Amount (Optional)</label>
+                        <input 
+                            type="number" 
+                            id="amount" 
+                            step="any"
+                            min="0"
+                            class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus-kaspa transition"
+                            placeholder="e.g. 150"
+                        />
+                    </div>
+                    <div>
+                        <label for="label" class="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Notes/Label (Optional)</label>
+                        <input 
+                            type="text" 
+                            id="label" 
+                            class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus-kaspa transition"
+                            placeholder="e.g. Donation"
+                        />
+                    </div>
+                </div>
+
+                <div class="flex flex-col items-center justify-center py-4 bg-slate-950/40 rounded-xl border border-slate-800">
+                    <div id="qrcode" class="bg-white p-3 rounded-lg shadow-inner min-h-[152px] flex items-center justify-center">
+                        <span class="text-xs text-slate-500 italic">Waiting for valid address...</span>
+                    </div>
+                    <div id="raw-uri" class="text-[10px] text-slate-500 font-mono mt-3 px-4 truncate max-w-xs text-center"></div>
+                </div>
+
+                <button 
+                    id="download-btn"
+                    disabled
+                    class="w-full py-3 bg-slate-700 hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed text-slate-900 font-medium rounded-xl transition shadow-lg cursor-pointer flex justify-center items-center gap-2"
+                >
+                    Save QR Code Image
+                </button>
             </div>
-            
-            <button 
-                id="downloadBtn" 
-                onclick="downloadQR()" 
-                class="mt-4 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-medium rounded-lg transition-colors hidden"
-            >
-                Download PNG
-            </button>
         </div>
-    </div>
+    </main>
+
+    <footer class="text-center py-4 text-xs text-slate-500 border-t border-slate-800 bg-slate-950/20">
+        <p>Your inputs never touch a server. Secure, ephemeral browser-only cryptography environment.</p>
+    </footer>
 
     <script>
-        // Clean vector asset for the Kaspa logo icon overlay
-        const kaspaLogoSrc = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100"><circle cx="50" cy="50" r="50" fill="%2370e3d4"/><path d="M25 50 L42 30 L55 30 L38 50 L55 70 L42 70 Z M48 50 L65 30 L78 30 L61 50 L78 70 L65 70 Z" fill="%230f172a"/></svg>`;
+        const addressInput = document.getElementById('address');
+        const amountInput = document.getElementById('amount');
+        const labelInput = document.getElementById('label');
+        const errorMsg = document.getElementById('error-msg');
+        const qrContainer = document.getElementById('qrcode');
+        const rawUriDisplay = document.getElementById('raw-uri');
+        const downloadBtn = document.getElementById('download-btn');
 
-        async function handleGeneration() {
-            let inputData = document.getElementById('kasInput').value.trim();
-            if (!inputData) {
-                alert('Please enter a Kaspa address or KNS domain.');
+        let qrInstance = null;
+
+        function updateQR() {
+            const rawAddress = addressInput.value.trim();
+            const amount = amountInput.value.trim();
+            const label = labelInput.value.trim();
+
+            // Early return baseline state clearing if input is empty
+            if (!rawAddress) {
+                qrContainer.innerHTML = '<span class="text-xs text-slate-500 italic">Waiting for valid address...</span>';
+                rawUriDisplay.textContent = "";
+                errorMsg.classList.add('hidden');
+                setBtnDisabled(true);
                 return;
             }
 
-            if (typeof QRCode === 'undefined') {
-                alert('Error: The QR Code engine library failed to load. Please check connection.');
+            // Validates strictly whether proper URI schema token structure exists 
+            if (!rawAddress.startsWith('kaspa:') && !rawAddress.startsWith('kaspatest:')) {
+                errorMsg.textContent = "Address must begin with 'kaspa:' or 'kaspatest:' scheme prefix.";
+                errorMsg.classList.remove('hidden');
+                qrContainer.innerHTML = '<span class="text-xs text-rose-400 font-medium">Invalid Address Format</span>';
+                rawUriDisplay.textContent = "";
+                setBtnDisabled(true);
                 return;
             }
 
-            setLoading(true);
-            hideOutputs();
+            errorMsg.classList.add('hidden');
 
-            // Intercept .kas domains
-            if (inputData.toLowerCase().endsWith('.kas')) {
-                try {
-                    // Normalize inputs for standard lookup formats
-                    let domainName = inputData.toLowerCase();
-                    if (!domainName.endsWith('.kas')) domainName += '.kas';
-                    
-                    // Directly query the public gateway indexer which permits all external web connections
-                    const response = await fetch(`https://api.kaspa.org/kns/domain/${domainName}`);
-                    
-                    if (!response.ok) {
-                        throw new Error('This domain name was not found or has expired on-chain.');
-                    }
-                    
-                    const data = await response.json();
-                    
-                    // Route out the wallet payload mapping
-                    if (data && data.address) {
-                        inputData = data.address;
-                        document.getElementById('resolvedAddress').innerText = inputData;
-                        document.getElementById('metaContainer').classList.remove('hidden');
-                    } else if (data && data.owner) {
-                        inputData = data.owner;
-                        document.getElementById('resolvedAddress').innerText = inputData;
-                        document.getElementById('metaContainer').classList.remove('hidden');
-                    } else {
-                        throw new Error(`Domain "${domainName}" found, but no target payment address is mapped.`);
-                    }
-                } catch (error) {
-                    alert(`KNS Resolver Error: ${error.message}`);
-                    setLoading(false);
-                    return;
-                }
+            // Formulates standards-compliant BIP-21 standard formatting string payload
+            let qrPayload = rawAddress;
+            const params = [];
+            
+            if (amount && parseFloat(amount) > 0) {
+                params.push(`amount=${encodeURIComponent(amount)}`);
+            }
+            if (label) {
+                params.push(`label=${encodeURIComponent(label)}`);
+            }
+            if (params.length > 0) {
+                qrPayload += `?${params.join('&')}`;
             }
 
-            generateFancyQR(inputData);
+            // Output generated structural URI data for user transparency
+            rawUriDisplay.textContent = qrPayload;
+            rawUriDisplay.title = qrPayload;
+
+            // Generate/re-render QR module
+            qrContainer.innerHTML = ""; 
+            qrInstance = new QRCode(qrContainer, {
+                text: qrPayload,
+                width: 160,
+                height: 160,
+                colorDark: "#020617", // slate-950 contrast mapping
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.M
+            });
+
+            setBtnDisabled(false);
         }
 
-        function generateFancyQR(walletAddress) {
-            try {
-                const qrDiv = document.getElementById('qrcode');
-                const canvas = document.getElementById('fancyCanvas');
-                const ctx = canvas.getContext('2d');
-                
-                qrDiv.innerHTML = "";
-                
-                const qr = new QRCode(qrDiv, {
-                    text: walletAddress,
-                    width: 300,
-                    height: 300,
-                    colorDark: "#0f172a",
-                    colorLight: "#ffffff",
-                    correctLevel: QRCode.CorrectLevel.H 
-                });
-
-                // Set short buffer timeout to guarantee standard output processing completion
-                setTimeout(() => {
-                    const qrImg = qrDiv.querySelector('img');
-                    if (!qrImg) {
-                        setLoading(false);
-                        return;
-                    }
-
-                    ctx.drawImage(qrImg, 0, 0, 300, 300);
-
-                    const logo = new Image();
-                    logo.src = kaspaLogoSrc;
-                    logo.onload = function() {
-                        const logoSize = 64; 
-                        const logoX = (canvas.width - logoSize) / 2;
-                        const logoY = (canvas.height - logoSize) / 2;
-
-                        ctx.fillStyle = "#ffffff";
-                        ctx.beginPath();
-                        ctx.arc(canvas.width / 2, canvas.height / 2, (logoSize / 2) + 4, 0, 2 * Math.PI);
-                        ctx.fill();
-
-                        ctx.drawImage(logo, logoX, logoY, logoSize, logoSize);
-                        
-                        document.getElementById('canvasContainer').classList.remove('hidden');
-                        document.getElementById('downloadBtn').classList.remove('hidden');
-                        setLoading(false);
-                    };
-                }, 200);
-            } catch (e) {
-                alert(`Matrix Compiler Failure: ${e.message}`);
-                setLoading(false);
-            }
-        }
-
-        function setLoading(isLoading) {
-            const btn = document.getElementById('generateBtn');
-            const spinner = document.getElementById('btnSpinner');
-            const text = document.getElementById('btnText');
-
-            if (isLoading) {
-                btn.disabled = true;
-                spinner.classList.remove('hidden');
-                text.innerText = "Resolving Blockchain Data...";
+        function setBtnDisabled(isDisabled) {
+            downloadBtn.disabled = isDisabled;
+            if (isDisabled) {
+                downloadBtn.classList.remove('bg-kaspa', 'hover:bg-[#5bb3a2]');
+                downloadBtn.classList.add('bg-slate-700');
             } else {
-                btn.disabled = false;
-                spinner.classList.add('hidden');
-                text.innerText = "Generate QR Code";
+                downloadBtn.classList.remove('bg-slate-700');
+                downloadBtn.classList.add('bg-kaspa', 'hover:bg-[#5bb3a2]');
             }
         }
 
-        function hideOutputs() {
-            document.getElementById('canvasContainer').classList.add('hidden');
-            document.getElementById('downloadBtn').classList.add('hidden');
-            document.getElementById('metaContainer').classList.add('hidden');
-        }
+        // Extracts nested image file stream generated inside DOM layout to trigger physical canvas saves
+        downloadBtn.addEventListener('click', () => {
+            const img = qrContainer.querySelector('img');
+            if (img && img.src) {
+                const link = document.createElement('a');
+                link.href = img.src;
+                link.download = `kaspa-qr-${Date.now()}.png`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        });
 
-        function downloadQR() {
-            const canvas = document.getElementById('fancyCanvas');
-            const link = document.createElement('a');
-            link.download = 'kaspa-fancy-qr.png';
-            link.href = canvas.toDataURL();
-            link.click();
-        }
+        // Event hooks tracking state manipulation
+        addressInput.addEventListener('input', updateQR);
+        amountInput.addEventListener('input', updateQR);
+        labelInput.addEventListener('input', updateQR);
     </script>
 </body>
 </html>
